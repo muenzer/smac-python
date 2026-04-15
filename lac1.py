@@ -91,7 +91,7 @@ class LAC1(object):
     if sleepfunc is not None:
       self._sleepfunc = sleepfunc
 
-    print 'Connecting to LAC-1 on %s (%s)'%(port, baudRate)
+    print('Connecting to controller on %s (%s)'%(port, baudRate))
     self._port = serial.Serial(
         port = port,
         baudrate = baudRate,
@@ -154,7 +154,7 @@ class LAC1(object):
     allowedtimeouts = int(30/self._port.timeout)
 
     while not done:
-      c = self._port.read()
+      c = self._port.read().decode('utf-8')
       if c == '\n':
         continue
       elif c == '\r':
@@ -172,7 +172,7 @@ class LAC1(object):
       raise Exception('LAC-1 Error: '+line[1:])
 
     if not self._silent:
-      print '[>]',line
+      print('[>]',line)
     return line
 
   def sendcmds(self, *args, **kwargs):
@@ -251,14 +251,14 @@ class LAC1(object):
     tosend = ','.join(cmds)
 
     if not self._silent:
-      print '[<]',tosend
+      print('[<]',tosend)
 
     self._port.flushInput()
     self._port.flushOutput()
 
     assert len(tosend) <= SERIAL_MAX_LINE_LENGTH, 'Command exceeds allowed line length'
 
-    self._port.write(tosend+'\r')
+    self._port.write(str.encode(tosend+'\r'))
 
     wait = kwargs.get('wait', True)
     callbackfunc = kwargs.get('callback', None)
@@ -485,9 +485,9 @@ class LAC1(object):
     while len(pos) < 1:
       try:
         pos = self.sendcmds('TP')
-      except Exception, ex:
+      except Exception:
         from traceback import print_exc
-        print_exc(ex)
+        print_exc()
 
     return int(pos[0])
 
@@ -508,17 +508,17 @@ class LAC1(object):
 
   def close(self):
     if self._port:
-      self._port.write(self._ESC)
-      self._port.write(self._ESC)
+      self._port.write(str.encode(self._ESC))
+      self._port.write(str.encode(self._ESC))
       # abort, motor off, echo on
-      self._port.write('AB,MF,EN\r')
+      self._port.write(str.encode('AB,MF,EN\r'))
       self._port.close()
       self._port = None
 
 if __name__ == '__main__':
   import sys
   if len(sys.argv) < 4:
-    print 'Usage: %s <serial port> <baud> <commands and arguments>'%(sys.argv[0])
+    print('Usage: %s <serial port> <baud> <commands and arguments>'%(sys.argv[0]))
     sys.exit(1)
 
   stage = LAC1(sys.argv[1], baudRate=int(sys.argv[2]))

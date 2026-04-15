@@ -19,7 +19,7 @@ dist = 2
 
 lac1.move_absolute_mm(0)
 starttime = time.time()
-for cnt in xrange(nloops):
+for cnt in range(nloops):
   try:
     lac1.move_absolute_mm(dist, wait=False)
     p = lac1.get_position_mm()
@@ -35,9 +35,9 @@ for cnt in xrange(nloops):
     sys.stdout.write('.')
     sys.stdout.flush()
     if cnt%100==0:
-      print cnt
-  except Exception, ex:
-    print 'Exception occured on loop %d'%(cnt+1), ex
+      print(cnt)
+  except Exception as ex:
+    print('Exception occured on loop %d' % (cnt+1), ex) 
     break
 
 dt = time.time() - starttime
@@ -45,6 +45,6 @@ dt = time.time() - starttime
 # we cover 2*dist per loop
 disttravelled = nloops * dist * 2
 
-print 'Travelled ', disttravelled,'mm'
-print 'Loops:',nloops, 'Loop distance:',dist*2
-print 'total time: %.2f\tavg speed: %.2f mm/s'%(dt, disttravelled/dt)
+print('Travelled ', disttravelled, 'mm')
+print('Loops:', nloops, 'Loop distance:', dist * 2)
+print('total time: %.2f\tavg speed: %.2f mm/s' % (dt, disttravelled / dt))
