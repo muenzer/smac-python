@@ -172,7 +172,7 @@ class LAC1(object):
       raise Exception('LAC-1 Error: '+line[1:])
 
     if not self._silent:
-      print('>[>]',line)
+      print('[>]',line)
     return line
 
   def sendcmds(self, *args, **kwargs):
@@ -485,7 +485,7 @@ class LAC1(object):
     while len(pos) < 1:
       try:
         pos = self.sendcmds('TP')
-      except Exception as ex:
+      except Exception:
         from traceback import print_exc
         print_exc()
 
