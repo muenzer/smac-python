@@ -316,7 +316,7 @@ class LAC1(object):
       self._last_serial_send_time = now 
       return None
 
-  def set_home_macro(self, force=False):
+  def set_home_macro(self, force=False, duty=0.9, mmpersecond=4, mmpersecondsquared=10000):
     """
     This function defines a homing macros on macros 100,101,102, and 105. It
     will also inserts a call to macro 100 in macro 0. This means this routine
@@ -332,6 +332,8 @@ class LAC1(object):
     This function does nothing if TM0 returns a non-zero length string, unless
     force is True.
     """
+
+    enc_counts_per_mm, _, SG, SI, SD, IL, _, RI, FR, _ = self.actuator
 
     macro0 = self.sendcmds('TM0')
     if len(macro0) == 0 or force:
@@ -351,7 +353,7 @@ class LAC1(object):
       # IL: integral limit
       # FR: derivative sampling frequency
       # RI: sampling rate of integral
-      self.sendcmds('MD100,SG50,SI80,SD700,IL5000,FR1,RI1')
+      self.sendcmds(f'MD100,SG{SG},SI{SI},SD{SD},IL{IL},FR{FR},RI{RI}')
 
       # go into velocity mode, turn motor on, set force, acceleration and
       # velocity constants, set direction to be in the direction of DECREASING
@@ -366,7 +368,13 @@ class LAC1(object):
       # DI: direction
       # GO: begin movement
       # WA: wait
-      self.sendcmds('MD101,VM,MN,SQ30000,SA30000,SV50000,DI1,GO,WA20')
+      SQ = int(duty * 32767)
+      print('SQ:', SQ)
+      SA = int(self.KA * mmpersecondsquared)
+      print('SA:', SA)
+      SV = int(self.KV * mmpersecond)
+      print('SV:', SV)
+      self.sendcmds(f'MD101,VM,MN,SQ{SQ},SA{SA},SV{SV},DI1,GO,WA20')
 
       # read word from memory 538, which is position error. If position error
       # is greater than 75, jump to macro 105, otherwise repeat.
@@ -394,8 +402,9 @@ class LAC1(object):
       # GO: start motion
       # WS: wait stop
       # DH: define home
+      # DI: direction
       # MF: motor off
-      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,MF')
+      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,DI0,MF')
 
       # MD: define macro
       # MC: call macro
