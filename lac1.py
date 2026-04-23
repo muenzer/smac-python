@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import serial
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, astuple
 
 # it is important to make these floats to avoid integer truncation error
 ENC_COUNTS_PER_MM = 1000.0  # default encoder counts per mm
@@ -50,6 +50,10 @@ class Actuator(object):
 
   def __post_init__(self):
     object.__setattr__(self, 'stage_travel_enc', self.stage_travel_mm * self.enc_counts_per_mm)
+
+  # Allow upacking
+  def __iter__(self):
+      return iter(astuple(self))
 
 class LAC1(object):
   """
