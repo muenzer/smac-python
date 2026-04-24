@@ -14,6 +14,8 @@ SERVO_LOOP_FREQ = '5000.0 1/s'    # servo loop frequency
 # This is specific to the stage I am using
 # TODO Implement range checking for safety?
 STAGE_TRAVEL_MM = '25 mm'
+MAX_FORCE = '90.0 N'            # maximum force at supply voltage in N
+FORCE_CONSTANT = '41.0 N/A'       # Force produced per current supplied in N/A
 
 # we will not allow travel beyond TRAVEL_SAFETY_FACTOR * STAGE_TRAVEL_ENC
 TRAVEL_SAFETY_FACTOR = 1.0
@@ -51,10 +53,14 @@ class Actuator(object):
   RI:int = RI
   FR:int = FR
   stage_travel_enc: float = field(init=False)
+  max_force: float = MAX_FORCE
+  force_constant: float = FORCE_CONSTANT
 
   def __post_init__(self):
     self.stage_travel_mm = ensure_units(self.stage_travel_mm, 'mm')
     self.enc_counts_per_mm = ensure_units(self.enc_counts_per_mm, 'counts / mm')
+    self.max_force = ensure_units(self.max_force, 'N')
+    self.force_constant = ensure_units(self.force_constant, 'N/A')
 
 class LAC1(object):
   """
