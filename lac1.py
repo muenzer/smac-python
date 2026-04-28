@@ -1,24 +1,18 @@
 #!/usr/bin/env python
 import serial
 import time
+from dataclasses import dataclass, field, astuple
 
 # it is important to make these floats to avoid integer truncation error
-ENC_COUNTS_PER_MM = 1000.0  # encoder counts per mm
+ENC_COUNTS_PER_MM = 1000.0  # default encoder counts per mm
 SERVO_LOOP_FREQ = 5000.0    # servo loop frequency
 
 # This is specific to the stage I am using
 # TODO Implement range checking for safety?
 STAGE_TRAVEL_MM = 25
-STAGE_TRAVEL_UM = STAGE_TRAVEL_MM*1000
-STAGE_TRAVEL_ENC = STAGE_TRAVEL_MM * ENC_COUNTS_PER_MM
 
 # we will not allow travel beyond TRAVEL_SAFETY_FACTOR * STAGE_TRAVEL_ENC
 TRAVEL_SAFETY_FACTOR = 1.0
-
-# KV and KA defined the change in encoder per servo loop needed to achieve
-# 1 mm/s velocity and 1 mm/s/s acceleration, respectively.
-KV = 65536 * ENC_COUNTS_PER_MM / SERVO_LOOP_FREQ
-KA = 65536 * ENC_COUNTS_PER_MM / (SERVO_LOOP_FREQ**2)
 
 # These parameters are dependent on the stage. See SMAC Actuators Users Manual
 SG = 50
@@ -37,6 +31,29 @@ SERIAL_SEND_WAIT_SEC = 0.100
 
 # Each line cannot exceed 127 characters as per LAC-1 manual
 SERIAL_MAX_LINE_LENGTH = 127
+
+@dataclass
+class Actuator(object):
+  """
+  Class to define parameters are dependent on the stage.
+  """
+  enc_counts_per_mm: float = ENC_COUNTS_PER_MM
+  stage_travel_mm: int = STAGE_TRAVEL_MM
+  SG:int = SG
+  SI:int = SI
+  SD:int = SD
+  IL:int = IL
+  SE:int = SE
+  RI:int = RI
+  FR:int = FR
+  stage_travel_enc: float = field(init=False)
+
+  def __post_init__(self):
+    object.__setattr__(self, 'stage_travel_enc', self.stage_travel_mm * self.enc_counts_per_mm)
+
+  # Allow upacking
+  def __iter__(self):
+      return iter(astuple(self))
 
 class LAC1(object):
   """
@@ -78,7 +95,7 @@ class LAC1(object):
 
   _last_serial_send_time = None
 
-  def __init__(self, port, baudRate, silent=True, reset=True, sleepfunc=None):
+  def __init__(self, port, baudRate, actuator=None, silent=True, reset=True, sleepfunc=None):
     """
     If silent is True, then no debugging output will be printed. Default is
     True.
@@ -90,6 +107,16 @@ class LAC1(object):
 
     if sleepfunc is not None:
       self._sleepfunc = sleepfunc
+
+    if actuator is None:
+      actuator = Actuator()
+
+    self.actuator = actuator
+
+    # KV and KA defined the change in encoder per servo loop needed to achieve
+    # 1 mm/s velocity and 1 mm/s/s acceleration, respectively.
+    self.KV = 65536 * self.actuator.enc_counts_per_mm / SERVO_LOOP_FREQ
+    self.KA = 65536 * self.actuator.enc_counts_per_mm / (SERVO_LOOP_FREQ**2)
 
     print('Connecting to controller on %s (%s)'%(port, baudRate))
     self._port = serial.Serial(
@@ -106,13 +133,13 @@ class LAC1(object):
 
     # setup some initial parameters
     self.sendcmds(
-        'SG', SG,
-        'SI', SI,
-        'SD', SD,
-        'IL', IL,
-        'SE', SE,
-        'RI', RI,
-        'FR', FR)
+        'SG', self.actuator.SG,
+        'SI', self.actuator.SI,
+        'SD', self.actuator.SD,
+        'IL', self.actuator.IL,
+        'SE', self.actuator.SE,
+        'RI', self.actuator.RI,
+        'FR', self.actuator.FR)
 
     # these are pretty safe values
     self.set_max_velocity(1)
@@ -293,7 +320,7 @@ class LAC1(object):
       self._last_serial_send_time = now 
       return None
 
-  def set_home_macro(self, force=False):
+  def set_home_macro(self, force=False, duty=0.9, mmpersecond=4, mmpersecondsquared=10000):
     """
     This function defines a homing macros on macros 100,101,102, and 105. It
     will also inserts a call to macro 100 in macro 0. This means this routine
@@ -309,6 +336,8 @@ class LAC1(object):
     This function does nothing if TM0 returns a non-zero length string, unless
     force is True.
     """
+
+    enc_counts_per_mm, _, SG, SI, SD, IL, _, RI, FR, _ = self.actuator
 
     macro0 = self.sendcmds('TM0')
     if len(macro0) == 0 or force:
@@ -328,7 +357,7 @@ class LAC1(object):
       # IL: integral limit
       # FR: derivative sampling frequency
       # RI: sampling rate of integral
-      self.sendcmds('MD100,SG50,SI80,SD700,IL5000,FR1,RI1')
+      self.sendcmds(f'MD100,SG{SG},SI{SI},SD{SD},IL{IL},FR{FR},RI{RI}')
 
       # go into velocity mode, turn motor on, set force, acceleration and
       # velocity constants, set direction to be in the direction of DECREASING
@@ -343,7 +372,13 @@ class LAC1(object):
       # DI: direction
       # GO: begin movement
       # WA: wait
-      self.sendcmds('MD101,VM,MN,SQ30000,SA30000,SV50000,DI1,GO,WA20')
+      SQ = int(duty * 32767)
+      print('SQ:', SQ)
+      SA = int(self.KA * mmpersecondsquared)
+      print('SA:', SA)
+      SV = int(self.KV * mmpersecond)
+      print('SV:', SV)
+      self.sendcmds(f'MD101,VM,MN,SQ{SQ},SA{SA},SV{SV},DI1,GO,WA20')
 
       # read word from memory 538, which is position error. If position error
       # is greater than 75, jump to macro 105, otherwise repeat.
@@ -371,8 +406,9 @@ class LAC1(object):
       # GO: start motion
       # WS: wait stop
       # DH: define home
+      # DI: direction
       # MF: motor off
-      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,MF')
+      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,DI0,MF')
 
       # MD: define macro
       # MC: call macro
@@ -412,10 +448,10 @@ class LAC1(object):
     self.sendcmds('MN','','GH', '')
 
   def set_max_velocity(self, mmpersecond):
-    self.sendcmds('SV', KV*mmpersecond)
+    self.sendcmds('SV', self.KV * mmpersecond)
 
   def set_max_acceleration(self, mmpersecondpersecond):
-    self.sendcmds('SA',KA*mmpersecondpersecond)
+    self.sendcmds('SA', self.KA * mmpersecondpersecond)
 
   def set_max_torque(self, q):
     """
@@ -434,7 +470,7 @@ class LAC1(object):
     """
     Move to a position specified in encoder counts
     """
-    assert pos_enc <= STAGE_TRAVEL_ENC * TRAVEL_SAFETY_FACTOR
+    assert pos_enc <= self.actuator.stage_travel_enc * TRAVEL_SAFETY_FACTOR
     assert pos_enc >= 0
 
     cmds = ['PM', '', 'MN', '', 'MA', int(pos_enc),'GO','']
@@ -450,13 +486,13 @@ class LAC1(object):
       return int(ret[0])
 
   def move_absolute_mm(self, pos_mm, **kwargs):
-    self.move_absolute_enc(pos_mm * ENC_COUNTS_PER_MM, **kwargs)
+    self.move_absolute_enc(pos_mm * self.actuator.enc_counts_per_mm, **kwargs)
 
   def move_absolute_um(self, pos_um, **kwargs):
     kwargs['getposition'] = True
-    ret = self.move_absolute_enc(pos_um * ENC_COUNTS_PER_MM / 1000, **kwargs)
+    ret = self.move_absolute_enc(pos_um * self.actuator.enc_counts_per_mm / 1000, **kwargs)
     if ret is not None:
-      return 1000 * ret / ENC_COUNTS_PER_MM
+      return 1000 * ret / self.actuator.enc_counts_per_mm
 
   def move_relative_enc(self, dist_enc, wait=True):
     self.sendcmds('PM', '', 'MN', '', 'MR', dist_enc, 'GO', '')
@@ -465,7 +501,7 @@ class LAC1(object):
       self.wait_stop()
 
   def move_relative_mm(self, dist_mm, **kwargs):
-    self.move_relative_enc(dist_mm * ENC_COUNTS_PER_MM, **kwargs)
+    self.move_relative_enc(dist_mm * self.actuator.enc_counts_per_mm, **kwargs)
 
   def get_error(self):
     """
@@ -495,10 +531,10 @@ class LAC1(object):
     """
     Returns the current position in mm
     """
-    return self.get_position_enc() / ENC_COUNTS_PER_MM
+    return self.get_position_enc() / self.actuator.enc_counts_per_mm
 
   def get_position_um(self):
-    return 1000 * self.get_position_enc() / ENC_COUNTS_PER_MM
+    return 1000 * self.get_position_enc() / self.actuator.enc_counts_per_mm
 
   def get_params(self, paramset=''):
     """
