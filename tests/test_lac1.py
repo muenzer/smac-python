@@ -56,6 +56,53 @@ def test_sendcmd_multiple(fake_serial):
     fake = fake_serial['instance']
     assert fake.written[-1] == b'AA,BB20\r'
 
+def test_sendcmd_set_home_macro_no_macro(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'')
+
+    controller.set_home_macro()
+
+    fake = fake_serial['instance']
+    assert fake.written[-8] == b'TM0\r'
+    assert fake.written[-7] == b'MF\r'    
+    assert fake.written[-6] == b'RM\r'
+    assert fake.written[-5] == b'MD100,SG50,SI80,SD700,IL5000,FR1,RI1\r'
+    assert fake.written[-4] == b'MD101,VM,MN,SQ30000,SA30000,SV50000,DI1,GO,WA20\r'
+    assert fake.written[-3] == b'MD102,RW538,IB-75,NO,MJ105,RP\r'
+    assert fake.written[-2] == b'MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,MF\r'
+    assert fake.written[-1] == b'MD0,MC100\r'
+
+def test_sendcmd_set_home_macro_existing_macro(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'MD0,MC100')
+
+    controller.set_home_macro()
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'TM0\r'
+
+def test_sendcmd_set_home_macro_force(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'MD0,MC100')
+
+    controller.set_home_macro(force=True)
+
+    fake = fake_serial['instance']
+    assert fake.written[-8] == b'TM0\r'
+    assert fake.written[-7] == b'MF\r'    
+    assert fake.written[-6] == b'RM\r'
+    assert fake.written[-5] == b'MD100,SG50,SI80,SD700,IL5000,FR1,RI1\r'
+    assert fake.written[-4] == b'MD101,VM,MN,SQ30000,SA30000,SV50000,DI1,GO,WA20\r'
+    assert fake.written[-3] == b'MD102,RW538,IB-75,NO,MJ105,RP\r'
+    assert fake.written[-2] == b'MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,MF\r'
+    assert fake.written[-1] == b'MD0,MC100\r'
+
 def test_home(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     controller.home()
