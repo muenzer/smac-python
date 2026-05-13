@@ -262,6 +262,6 @@ class VLC(LAC1):
         q = self._calculate_current_constant(force)
         self.set_max_velocity('10 mm/s')
         self.sendcmds('SQ', f, 'VM', '', 'MN', '', 'GO', '')
-        self.sendcmds('RW', 548, 'IG', q, 'NO', '', 'EP', '', 'RP', 1000, wait=True)
+        self.sendcmds('WA', 25, 'RW', 548, 'IG', q, 'NO', '', 'EP', '', 'RP', 1000, wait=True)
         if hold:
             self.sendcmds('SC', 8000, 'QM', '1', 'SQ', q)
