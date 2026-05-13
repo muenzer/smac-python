@@ -145,6 +145,16 @@ def test_move_to_force(fake_serial):
     controller.move_to_force('10 N')
 
     fake = fake_serial['instance']
-    assert fake.written[-2] == b'VM,MN,GO\r'
-    assert fake.written[-1] == b'RW548,IG43,ST,EP,RP\r'
+    assert fake.written[-2] == b'SQ3640,VM,MN,GO\r'
+    assert fake.written[-1] == b'WA25,RW548,IG43,NO,EP,RP1000\r'
+
+def test_move_to_force_hold(fake_serial):
+    actuator = Actuator(force_constant='41 N/A')
+    controller = VLC(port='COM_TEST', baudRate=9600, actuator=actuator)
+    controller.move_to_force('10 N', hold=True)
+
+    fake = fake_serial['instance']
+    assert fake.written[-3] == b'SQ3640,VM,MN,GO\r'
+    assert fake.written[-2] == b'WA25,RW548,IG43,NO,EP,RP1000\r'
+    assert fake.written[-1] == b'SC8000,QM1,SQ43\r'
 
