@@ -120,7 +120,7 @@ class VLC(LAC1):
 
         return self.sendcmds('MS300')
 
-    def phase_motors(self, ec_counts=47800):
+    def phase_motors(self, ec_counts=47800, confirm=True):
         ideal = int(ec_counts / 4)
         upper = int(ideal * 1.1)
         lower = int(ideal * 0.9)
@@ -202,7 +202,8 @@ class VLC(LAC1):
             f'MD208,RA4,DA@0,EC{ec_counts},SQ0,MF,MG"Phasing Succesfull, stepsize ({ideal})= ":5'
         )
 
-        input('Press enter to start phasing')
+        if confirm:
+            input('Press enter to start phasing')
         return self.sendcmds('MS200')
     
     def parameter_save(self):
