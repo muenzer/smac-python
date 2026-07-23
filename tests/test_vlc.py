@@ -111,6 +111,48 @@ def test_phase_motors(fake_serial, monkeypatch):
     )
     assert fake.written[-1] == b'MS200\r'
 
+def test_phase_motors_wihtout_input(fake_serial):
+    controller = VLC(port='COM_TEST', baudRate=9600)
+    controller.phase_motors(confirm=False)
+
+    fake = fake_serial['instance']
+    assert (
+        fake.written[-10] == b'MD200,PH1,MF,EC0,SP0,PM,SQ32767,QM0,MN,SQ9502\r'
+    )
+    assert (
+        fake.written[-9]
+        == b'MD201,AL23900,AR4,RL494,AR3,SP16383,WA400,RL494,AS@3,AR5,IG10755,IB13145,MJ208,NO,MC207\r'
+    )
+    assert (
+        fake.written[-8]
+        == b'MD202,AL35850,AR4,RL494,AR3,SP32767,WA400,RL494,AS@3,AR5,IG10755,IB13145,MJ208,NO,MC207\r'
+    )
+    assert (
+        fake.written[-7]
+        == b'MD203,AL47800,AR4,RL494,AR3,SP49150,WA400,RL494,AS@3,AR5,IG10755,IB13145,MJ208,NO,MC207\r'
+    )
+    assert (
+        fake.written[-6]
+        == b'MD204,AL35850,AR4,RL494,AR3,SP32767,WA400,RL494,AS@3,AM-1,AR5,IG10755,IB13145,MJ208,NO,MC207\r'
+    )
+    assert (
+        fake.written[-5]
+        == b'MD205,AL23900,AR4,RL494,AR3,SP16383,WA400,RL494,AS@3,AM-1,AR5,IG10755,IB13145,MJ208,NO,MC207\r'
+    )
+    assert (
+        fake.written[-4]
+        == b'MD206,AL11950,AR4,RL494,AR3,SP0,WA400,RL494,AS@3,AM-1,AR5,IG10755,IB13145,MJ208,NO,MC207,SQ0,MG"Phasing NOK",EP \r'
+    )
+    assert (
+        fake.written[-3]
+        == b'MD207,NO,MG"Ideal step [enc cnts]= 11950. Actual step= ":5,RC \r'
+    )
+    assert (
+        fake.written[-2]
+        == b'MD208,RA4,DA@0,EC47800,SQ0,MF,MG"Phasing Succesfull, stepsize (11950)= ":5\r'
+    )
+    assert fake.written[-1] == b'MS200\r'
+
 def test_parameter_save(fake_serial):
     controller = VLC(port='COM_TEST', baudRate=9600)
     controller.parameter_save()
