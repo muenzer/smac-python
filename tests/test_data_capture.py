@@ -51,6 +51,19 @@ def test_setup_data_capture_to_many(fake_serial):
     with pytest.raises(ValueError):
         controller.setup_data_capture(variables = ['position', 'position', 'position', 'position', 'position'])
 
+def test_setup_data_capture_fractional_counts(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.setup_data_capture(time='9.5 s', rate='1/s', variables=['current', 'position'])
+
+    fake = fake_serial['instance']
+    assert fake.written[-7] == b'CS20\r'
+    assert fake.written[-6] == b'AL5000,WW422\r'
+    assert fake.written[-5] == b'AL2,WW1600\r'
+    assert fake.written[-4] == b'AL548,WW1602\r'
+    assert fake.written[-3] == b'AL2,WW1604\r'
+    assert fake.written[-2] == b'AL494,WW1606\r'
+    assert fake.written[-1] == b'AL0,WW1608\r'
+
 def test_capture_data(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 
@@ -69,6 +82,16 @@ def test_raw_data(fake_serial):
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'DD4000\r'
+
+def test_raw_data_partial(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    data = controller.setup_data_capture(time='20 s', rate='100/s', variables=['current', 'position'])
+    data.capture()
+    data.raw(time='5 s')
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'DD1000\r'
 
 def test_raw_data_response(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
@@ -126,6 +149,28 @@ def test_data_response(fake_serial):
     assert len(response['position']) == 5
     assert response['current'].check('A') == True
     assert response['position'].check('mm') == True    
+
+def test_data_response_partial(fake_serial):
+    actuator = Actuator(
+        enc_counts_per_mm='100.0 counts/mm',
+        stage_travel_mm='100.0 mm',
+        SG=10,
+        SI=4,
+        SD=100,
+        IL=15000
+    )
+
+    controller = LAC1(port='COM_TEST', baudRate=9600, actuator=actuator)
+
+    fake = fake_serial['instance']
+
+    data = controller.setup_data_capture(time='5 s', rate='1/s', variables=['current', 'position'])
+    data.capture()
+
+    response = data.data(time='2 s')
+    print(response)
+
+    assert fake.written[-1] == b'DD4\r'
 
 def test_data_response_current(fake_serial):
     actuator = Actuator(
