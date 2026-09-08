@@ -7,29 +7,29 @@ class Data(object):
     def __init__(self, controller, time: Union[int, float, str, Quantity], rate: Union[int, float, str, Quantity], variables: list[str], units: list[str] | None = None):
         if not variables:
             raise ValueError('At least one variable must be defined')
-        num = len(variables)
+        self._num = len(variables)
 
-        if num > 4:
+        if self._num > 4:
             raise ValueError('Data Capture is limited to 4 variables')
 
         if units is None:
-            units = [''] * num
-        elif num != len(units):
+            units = [''] * self._num
+        elif self._num != len(units):
             raise ValueError('Number of variables and number of units must be the same')
 
         time = ensure_units(time, 's')
-        rate = ensure_units(rate, '1/s')
+        self._rate = ensure_units(rate, '1/s')
    
         self._controller = controller
         # Round up number of samples to ensure enough allocation
-        self._samples = int(np.ceil((time * rate).magnitude))
-        self._memorySpace = self._samples * num
+        self._samples = int(np.ceil((time * self._rate).magnitude))
+        self._memorySpace = self._samples * self._num
         self._variables = variables
         self._units = []
     
         self._controller.sendcmds('CS', self._memorySpace)
-        self._controller.write_word((self._controller.servo_loop_frequency / rate).magnitude, 422)
-        self._controller.write_word(num, 1600)
+        self._controller.write_word((self._controller.servo_loop_frequency / self._rate).magnitude, 422)
+        self._controller.write_word(self._num, 1600)
 
         for idx, variable in enumerate(self._variables):
             match variable:
@@ -62,18 +62,25 @@ class Data(object):
     def capture(self):
         self._controller.sendcmds('CD', self._memorySpace)
 
-    def raw(self):
+    def raw(self, time: Union[int, float, str, Quantity, None] = None):
+        if(time is None):
+            memory = self._memorySpace
+        else:
+            time = ensure_units(time, 's')
+            memory = int(np.ceil((time * self._rate).magnitude)) * self._num
+        
         raw_data = {name: [] for name in self._variables}
 
         def log(line):
             for name, val in zip(self._variables, line.split(',')):
                 raw_data[name].append(int(val))
 
-        self._controller.sendcmds('DD', self._memorySpace, wait=True, callback=log)
+        self._controller.sendcmds('DD', memory, wait=True, callback=log)
         return {name: np.array(vals) for name, vals in raw_data.items()}
 
-    def data(self):
-        raw_data = self.raw()
+    def data(self, time: Union[int, float, str, Quantity, None] = None):
+
+        raw_data = self.raw(time)
 
         response = {}
 

@@ -83,6 +83,16 @@ def test_raw_data(fake_serial):
     fake = fake_serial['instance']
     assert fake.written[-1] == b'DD4000\r'
 
+def test_raw_data_partial(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    data = controller.setup_data_capture(time='20 s', rate='100/s', variables=['current', 'position'])
+    data.capture()
+    data.raw(time='5 s')
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'DD1000\r'
+
 def test_raw_data_response(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 
@@ -139,6 +149,28 @@ def test_data_response(fake_serial):
     assert len(response['position']) == 5
     assert response['current'].check('A') == True
     assert response['position'].check('mm') == True    
+
+def test_data_response_partial(fake_serial):
+    actuator = Actuator(
+        enc_counts_per_mm='100.0 counts/mm',
+        stage_travel_mm='100.0 mm',
+        SG=10,
+        SI=4,
+        SD=100,
+        IL=15000
+    )
+
+    controller = LAC1(port='COM_TEST', baudRate=9600, actuator=actuator)
+
+    fake = fake_serial['instance']
+
+    data = controller.setup_data_capture(time='5 s', rate='1/s', variables=['current', 'position'])
+    data.capture()
+
+    response = data.data(time='2 s')
+    print(response)
+
+    assert fake.written[-1] == b'DD4\r'
 
 def test_data_response_current(fake_serial):
     actuator = Actuator(
