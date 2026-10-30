@@ -252,7 +252,7 @@ class VLC(LAC1):
 
         self.set_max_torque(q)
 
-    def move_to_force(self, force, hold=False):
+    def move_to_force(self, force, speed='10 mm/s', hold=False):
         """
         Starts a velocity move and moves until the current exceeds the value 
         based on the corresponding force
@@ -261,7 +261,7 @@ class VLC(LAC1):
         
         f = self._calculate_voltage_constant(force)
         q = self._calculate_current_constant(force)
-        self.set_max_velocity('10 mm/s')
+        self.set_max_velocity(speed)
         self.sendcmds('SQ', f, 'VM', '', 'MN', '', 'GO', '')
         self.sendcmds('WA', 25, 'RW', 548, 'IG', q, 'NO', '', 'EP', '', 'RP', 1000, wait=True)
         if hold:
